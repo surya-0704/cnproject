@@ -1,13 +1,16 @@
 import socket
 import threading
+import sys
 from config import HOST, PORT, BUFFER_SIZE, ENCODING
 
 def receive_messages(sock):
     while True:
         try:
             msg = sock.recv(BUFFER_SIZE).decode(ENCODING)
-            if msg:
-                print(f"\n[📢] {msg}")
+            if not msg:
+                continue
+
+            print(f"\n[📢] {msg}")
         except:
             print("[✖] Lost connection to server.")
             break

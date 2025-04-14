@@ -10,6 +10,11 @@ highest_bidder = "None"
 host_name = None
 bidding_open = True
 
+timeout_thread = None
+timeout_lock = threading.Lock()
+auction_timeout_duration = 15  # seconds
+
+
 def broadcast(message):
     for conn, _ in clients:
         try:
@@ -38,10 +43,32 @@ def assign_new_host():
     else:
         host_name = None
 
+def end_auction_due_to_timeout():
+    global bidding_open
+    if bidding_open:
+        bidding_open = False
+        broadcast(f"[🏁] Auction Ended due to inactivity.")
+        broadcast(f"[👑] Winner: {highest_bidder} with ₹{highest_bid}")
+
+def start_or_reset_timeout():
+    global timeout_thread
+
+    def timeout_checker():
+        time.sleep(auction_timeout_duration)
+        with timeout_lock:
+            if bidding_open:
+                end_auction_due_to_timeout()
+
+    if timeout_thread and timeout_thread.is_alive():
+        # let it finish, just restart a new one
+        pass
+
+    timeout_thread = threading.Thread(target=timeout_checker, daemon=True)
+    timeout_thread.start()
+
 def countdown_timer(duration):
     global bidding_open
     for i in range(duration, 0, -1):
-        broadcast(f"[⏳] Auction ends in {i} seconds...")
         time.sleep(1)
     bidding_open = False
     broadcast(f"[🏁] Auction Ended! Winner: {highest_bidder} with ₹{highest_bid}")
@@ -77,8 +104,8 @@ def handle_client(conn, addr):
                         highest_bid = amount
                         highest_bidder = name
                         msg = format_bid(name, amount)
-                        print(msg)
                         broadcast(f"[BID-UPDATE] {msg}")
+                        start_or_reset_timeout()  # 🔥 Restart inactivity timeout
                     else:
                         send_to(conn, f"[⚠] Bid ₹{amount} too low. Current highest: ₹{highest_bid}")
                 except:
@@ -131,4 +158,4 @@ def start_server():
         thread.start()
 
 if __name__ == "__main__":
-    start_server() 
+    start_server()
