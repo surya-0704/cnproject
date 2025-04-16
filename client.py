@@ -11,6 +11,12 @@ def receive_messages(sock):
                 continue
 
             print(f"\n[📢] {msg}")
+
+            # Check for host confirmation prompt
+            if msg.startswith("[🔁]") and "Type YES to allow or NO to reject" in msg:
+                decision = input("→ ").strip().lower()
+                sock.send(decision.encode(ENCODING))
+
         except:
             print("[✖] Lost connection to server.")
             break
@@ -31,8 +37,10 @@ def client_program():
   host             → Request to become host
   list             → Show current highest bid
   end_auction      → (Host Only) End the auction
+  item             → (Host Only) Set item and minimum bid
   exit             → Exit the auction
     """)
+
 
     while True:
         user_input = input("→ ").strip()
@@ -53,6 +61,22 @@ def client_program():
             sock.send("LIST".encode(ENCODING))
         elif user_input.lower() == "end_auction":
             sock.send("END_AUCTION".encode(ENCODING))
+        elif user_input.lower() == "item":
+            print("[📦] Enter item name:")
+            item_name = input("→ ").strip()
+            if not item_name:
+                print("[⚠] Item name cannot be empty.")
+                continue
+
+            print("[💰] Enter minimum bid:")
+            min_bid_input = input("→ ").strip()
+            if not min_bid_input.isdigit():
+                print("[⚠] Invalid minimum bid. It must be a number.")
+                continue
+
+            msg = f"ITEM:{item_name}:{min_bid_input}"
+            sock.send(msg.encode(ENCODING))
+
         else:
             sock.send(user_input.encode(ENCODING))
 
