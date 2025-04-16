@@ -5,14 +5,15 @@ from config import HOST, PORT, BUFFER_SIZE, ENCODING
 from utils import format_bid
 
 clients = []  # list of (conn, name)
-highest_bid = 0
+highest_bid = -1
 highest_bidder = "None"
 host_name = None
 bidding_open = True
+current_item = "None"
 
 timeout_thread = None
 timeout_lock = threading.Lock()
-auction_timeout_duration = 15  # seconds
+auction_timeout_duration = 150  # seconds
 
 
 def broadcast(message):
@@ -98,6 +99,15 @@ def handle_client(conn, addr):
                 if not bidding_open:
                     send_to(conn, "[🚫] Auction has ended. No more bids allowed.")
                     continue
+                elif highest_bid == -1 :
+                    send_to(conn,"[🚫] Item is not annouced yet.")
+                    continue
+                elif name == host_name:
+                    send_to(conn, "[🚫] You are the host can't place bid")
+                    continue 
+                elif name == highest_bidder:
+                    send_to(conn,"[🚫] same person can't place bid twice")
+                    continue
                 try:
                     amount = int(data.split(":")[1])
                     if amount > highest_bid:
@@ -112,8 +122,31 @@ def handle_client(conn, addr):
                     send_to(conn, "[❌] Invalid bid format. Use BID:<amount>")
 
             elif data.startswith("HOST_REQ"):
-                host_name = name
-                broadcast(f"[🎥] {name} is now the host! Switching video stream...")
+                if name == host_name:
+                    send_to(conn, "[ℹ️] You are already the host.")
+                    continue
+
+                # Find the current host's connection
+                host_conn = None
+                for c, n in clients:
+                    if n == host_name:
+                        host_conn = c
+                        break
+
+                if host_conn:
+                    try:
+                        send_to(host_conn, f"[🔁] {name} wants to become the host. Approve? (yes/no): ")
+                        response = host_conn.recv(BUFFER_SIZE).decode(ENCODING).strip().lower()
+                        if response == "yes":
+                            host_name = name
+                            broadcast(f"[🎥] Host changed! {host_name} is the new host.")
+                        else:
+                            send_to(conn, "[❌] Host request denied by current host.")
+                    except:
+                        send_to(conn, "[❌] Failed to reach current host.")
+                else:
+                    send_to(conn, "[⚠️] No host found to approve your request.")
+
 
             elif data.startswith("LIST"):
                 send_to(conn, f"[📋] Current highest: ₹{highest_bid} by {highest_bidder}")
@@ -135,6 +168,28 @@ def handle_client(conn, addr):
                         send_to(conn, "[❌] Usage: START_COUNTDOWN <seconds>")
                 else:
                     send_to(conn, "[❌] Only host can start countdown.")
+            elif data.startswith("ITEM:"):
+                if name != host_name:
+                    send_to(conn, "[❌] Only host can set the auction item.")
+                    continue
+
+                try:
+                    parts = data.split(":")
+                    item_name = parts[1].strip()
+                    min_bid = int(parts[2].strip())
+
+                    if min_bid <= 0:
+                        send_to(conn, "[⚠] Minimum bid must be greater than 0.")
+                        continue
+
+                    current_item = item_name
+                    highest_bid = min_bid
+                    highest_bidder = "None"
+                    broadcast(f"[📦] Item for Auction: {item_name}, Minimum Bid: ₹{min_bid}")
+                    start_or_reset_timeout()
+                except:
+                    send_to(conn, "[❌] Invalid item command format. Use: item")
+
 
         except Exception as e:
             print(f"[!] Error with {name}: {e}")
