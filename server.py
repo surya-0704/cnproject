@@ -13,7 +13,7 @@ current_item = "None"
 
 timeout_thread = None
 timeout_lock = threading.Lock()
-auction_timeout_duration = 150  # seconds
+auction_timeout_duration = 15  # seconds
 
 
 def broadcast(message):
@@ -49,7 +49,10 @@ def end_auction_due_to_timeout():
     if bidding_open:
         bidding_open = False
         broadcast(f"[🏁] Auction Ended due to inactivity.")
-        broadcast(f"[👑] Winner: {highest_bidder} with ₹{highest_bid}")
+        if highest_bidder=="None":
+            broadcast(f"[🏁] Item unsold!")
+        else:
+            broadcast(f"[👑] Winner: {highest_bidder} with ₹{highest_bid}")
 
 def start_or_reset_timeout():
     global timeout_thread
@@ -120,7 +123,13 @@ def handle_client(conn, addr):
                         send_to(conn, f"[⚠] Bid ₹{amount} too low. Current highest: ₹{highest_bid}")
                 except:
                     send_to(conn, "[❌] Invalid bid format. Use BID:<amount>")
-
+            elif data.startswith("MSG:"):
+                message = data[4:].strip()
+                if message:
+                    sender = get_client_name(conn)
+                    broadcast(f"@{sender} : {message}")
+                else:
+                    send_to(conn, "[⚠] Cannot send empty message.")
             elif data.startswith("HOST_REQ"):
                 if name == host_name:
                     send_to(conn, "[ℹ️] You are already the host.")
@@ -149,6 +158,9 @@ def handle_client(conn, addr):
 
 
             elif data.startswith("LIST"):
+                if highest_bidder=="None":
+                    send_to(conn, "[🚫] No bid till now")
+                    continue
                 send_to(conn, f"[📋] Current highest: ₹{highest_bid} by {highest_bidder}")
 
             elif data.startswith("END_AUCTION"):
@@ -157,7 +169,16 @@ def handle_client(conn, addr):
                     continue
                 bidding_open = False
                 broadcast(f"[🏁] Auction Ended by Host!")
+                if highest_bid==-1 or highest_bidder== "None":
+                    broadcast(f"[❌] No item or item unsold!" )
+                    continue
                 broadcast(f"[👑] Winner: {highest_bidder} with ₹{highest_bid}")
+                for conn, _ in clients:
+                    try:
+                        conn.close()
+                    except:
+                        pass
+
 
             elif data.startswith("START_COUNTDOWN"):
                 if name == host_name:
@@ -187,6 +208,7 @@ def handle_client(conn, addr):
                     highest_bidder = "None"
                     broadcast(f"[📦] Item for Auction: {item_name}, Minimum Bid: ₹{min_bid}")
                     start_or_reset_timeout()
+                    bidding_open = True
                 except:
                     send_to(conn, "[❌] Invalid item command format. Use: item")
 
@@ -196,6 +218,7 @@ def handle_client(conn, addr):
             break
 
     print(f"[-] {name} disconnected")
+    broadcast(f"[-] {name} disconnected")
     clients.remove((conn, name))
     if name == host_name:
         assign_new_host()
