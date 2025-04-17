@@ -38,8 +38,10 @@ def client_program():
   list             → Show current highest bid
   end_auction      → (Host Only) End the auction
   item             → (Host Only) Set item and minimum bid
+  msg <message>    → Live chat
   exit             → Exit the auction
-    """)
+""")
+
 
 
     while True:
@@ -57,10 +59,17 @@ def client_program():
                 print("[⚠] Invalid bid. Usage: bid <amount>")
         elif user_input.lower() == "host":
             sock.send("HOST_REQ".encode(ENCODING))
+            print("[ ] Request sent!")
         elif user_input.lower() == "list":
             sock.send("LIST".encode(ENCODING))
         elif user_input.lower() == "end_auction":
             sock.send("END_AUCTION".encode(ENCODING))
+        elif user_input.lower().startswith("msg "):
+            message = user_input[4:].strip()
+            if message:
+                sock.send(f"MSG:{message}".encode(ENCODING))
+            else:
+                print("[⚠] Message cannot be empty.")
         elif user_input.lower() == "item":
             print("[📦] Enter item name:")
             item_name = input("→ ").strip()
