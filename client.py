@@ -8,9 +8,10 @@ def receive_messages(sock):
         try:
             msg = sock.recv(BUFFER_SIZE).decode(ENCODING)
             if not msg:
-                continue
-
-            print(f"\n[📢] {msg}")
+                print("[✖] Server closed the connection.")
+                break
+            else:
+                print(f"\n[📢] {msg}")
 
             # Check for host confirmation prompt
             if msg.startswith("[🔁]") and "Type YES to allow or NO to reject" in msg:
