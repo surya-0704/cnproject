@@ -3,6 +3,7 @@ import threading
 import time
 from config import HOST, PORT, BUFFER_SIZE, ENCODING
 from utils import format_bid
+# from video_stream_new import video_stream_server
 
 clients = []  # list of (conn, name)
 highest_bid = -1
@@ -13,7 +14,7 @@ current_item = "None"
 
 timeout_thread = None
 timeout_lock = threading.Lock()
-auction_timeout_duration = 15  # seconds
+auction_timeout_duration = 300  # seconds
 
 
 def broadcast(message):
@@ -89,6 +90,7 @@ def handle_client(conn, addr):
         host_name = name
         send_to(conn, "[🎥] You are the initial host.")
         broadcast(f"[🎥] {host_name} is the host!")
+        # video_stream_server()
 
     broadcast(f"[+] {name} joined the auction.")
 
@@ -149,6 +151,7 @@ def handle_client(conn, addr):
                         if response == "yes":
                             host_name = name
                             broadcast(f"[🎥] Host changed! {host_name} is the new host.")
+                            # video_stream_server()
                         else:
                             send_to(conn, "[❌] Host request denied by current host.")
                     except:
@@ -173,11 +176,17 @@ def handle_client(conn, addr):
                     broadcast(f"[❌] No item or item unsold!" )
                     continue
                 broadcast(f"[👑] Winner: {highest_bidder} with ₹{highest_bid}")
-                for conn, _ in clients:
+                time.sleep(1)
+                for conn, _ in list(clients):
                     try:
+                        # clients.remove((conn,_))
+                        # conn.close()
+                        conn.shutdown(socket.SHUT_RDWR)  # Gracefully shutdown first
                         conn.close()
+                        
                     except:
                         pass
+                clients.clear()
 
 
             elif data.startswith("START_COUNTDOWN"):
@@ -215,14 +224,20 @@ def handle_client(conn, addr):
 
         except Exception as e:
             print(f"[!] Error with {name}: {e}")
+            # clients.remove((conn, name))
+            conn.close()
+            clients[:] = [c for c in clients if c[0] != conn]
+            # print(f"[-] {name} disconnected")
             break
 
     print(f"[-] {name} disconnected")
     broadcast(f"[-] {name} disconnected")
-    clients.remove((conn, name))
+    print("Current Clients:",[name for _,name in clients])
+    # if(len(clients)!=0):
+        
     if name == host_name:
         assign_new_host()
-    conn.close()
+    # conn.close()
 
 def start_server():
     raw_server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
