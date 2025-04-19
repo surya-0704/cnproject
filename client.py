@@ -2,11 +2,23 @@ import socket
 import threading
 import sys
 from config import HOST, PORT, BUFFER_SIZE, ENCODING
+from video_stream_new import video_stream_client,video_stream_server
 
 def receive_messages(sock):
     while True:
         try:
+            print("trying to recieve msg")
             msg = sock.recv(BUFFER_SIZE).decode(ENCODING)
+            print("msg")
+            # if msg.startswith("[🎥]") and "You are the initial host." in msg:
+            #     video_stream_server()
+            # if msg.startswith("[🎥]") and "You joined the auction." in msg:
+            #     video_stream_client()
+            if msg.startswith("[🎥]") and "You are the initial host." in msg:
+                threading.Thread(target=video_stream_server, daemon=True).start()
+            if msg.startswith("[🎥]") and "You joined the auction." in msg:
+                threading.Thread(target=video_stream_client, daemon=True).start()
+
             if not msg:
                 print("[✖] Server closed the connection.")
                 break
