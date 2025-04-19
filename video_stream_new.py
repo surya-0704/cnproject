@@ -5,21 +5,11 @@ import pickle
 import struct
 import time
 
-HOST = '10.200.245.118'
+HOST = '10.200.255.105'
 VIDEO_PORT = 9998
 
-# --- VIDEO STREAM SERVER (HOST) ---
-def video_stream_server():
-    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server_socket.bind((HOST, VIDEO_PORT))
-    server_socket.listen(1)
-    print(f"[📹] Video streaming server listening on {HOST}:{VIDEO_PORT}")
-
-    client_socket, addr = server_socket.accept()
+def handle_video_client(client_socket, addr, cap):
     print(f"[✅] Video stream client connected: {addr}")
-
-    cap = cv2.VideoCapture(0)
-
     try:
         while cap.isOpened():
             ret, frame = cap.read()
@@ -30,17 +20,66 @@ def video_stream_server():
             msg = struct.pack("Q", len(data)) + data
             client_socket.sendall(msg)
     except Exception as e:
+        print(f"[❌ Client Error {addr}] {e}")
+    finally:
+        client_socket.close()
+        print(f"[🔌] Disconnected: {addr}")
+
+def video_stream_server():
+    print("calling video stream server")
+    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server_socket.bind((HOST, VIDEO_PORT))
+    server_socket.listen(5)  # Allow up to 5 queued connections
+    print(f"[📹] Video streaming server listening on {HOST}:{VIDEO_PORT}")
+
+    cap = cv2.VideoCapture(0)
+
+    try:
+        while True:
+            client_socket, addr = server_socket.accept()
+            thread = threading.Thread(target=handle_video_client, args=(client_socket, addr, cap))
+            thread.start()
+    except Exception as e:
         print(f"[❌ Server Error] {e}")
     finally:
         cap.release()
-        client_socket.close()
         server_socket.close()
-        print("[🛑] Video stream closed.")
+        print("[🛑] Video stream server closed.")
+# # --- VIDEO STREAM SERVER (HOST) ---
+# def video_stream_server():
+#     print("calling video stream server")
+#     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+#     server_socket.bind((HOST, VIDEO_PORT))
+#     server_socket.listen(1)
+#     print(f"[📹] Video streaming server listening on {HOST}:{VIDEO_PORT}")
+
+#     client_socket, addr = server_socket.accept()
+#     print(f"[✅] Video stream client connected: {addr}")
+
+#     cap = cv2.VideoCapture(0)
+
+#     try:
+#         while cap.isOpened():
+#             ret, frame = cap.read()
+#             if not ret:
+#                 break
+
+#             data = pickle.dumps(frame)
+#             msg = struct.pack("Q", len(data)) + data
+#             client_socket.sendall(msg)
+#     except Exception as e:
+#         print(f"[❌ Server Error] {e}")
+#     finally:
+#         cap.release()
+#         client_socket.close()
+#         server_socket.close()
+#         print("[🛑] Video stream closed.")
 
 
 # --- VIDEO CLIENT VIEWER ---
 def video_stream_client():
-    time.sleep(1)  # Allow server to start first
+    print("calling video stream client")
+    time.sleep(5)  # Allow server to start first
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     client_socket.connect((HOST, VIDEO_PORT))
 
