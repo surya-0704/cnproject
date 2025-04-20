@@ -1,15 +1,14 @@
 import socket
 import threading
 import sys
+import time
 from config import HOST, PORT, BUFFER_SIZE, ENCODING
-from video_stream_new import video_stream_client,video_stream_server
+from video_stream_new import video_stream_client,video_stream_server,stop_streaming
 
 def receive_messages(sock):
     while True:
         try:
-            print("trying to recieve msg")
             msg = sock.recv(BUFFER_SIZE).decode(ENCODING)
-            print("msg")
             # if msg.startswith("[🎥]") and "You are the initial host." in msg:
             #     video_stream_server()
             # if msg.startswith("[🎥]") and "You joined the auction." in msg:
@@ -28,8 +27,11 @@ def receive_messages(sock):
             # Check for host confirmation prompt
             if msg.startswith("[🔁]") and "Type YES to allow or NO to reject" in msg:
                 decision = input("→ ").strip().lower()
+                print("printing decision:",decision)
+                if decision=="yes":
+                    stop_streaming()
+                time.sleep(1)
                 sock.send(decision.encode(ENCODING))
-
         except:
             print("[✖] Lost connection to server.")
             break
@@ -76,6 +78,7 @@ def client_program():
         elif user_input.lower() == "list":
             sock.send("LIST".encode(ENCODING))
         elif user_input.lower() == "end_auction":
+            stop_streaming()
             sock.send("END_AUCTION".encode(ENCODING))
         elif user_input.lower().startswith("msg "):
             message = user_input[4:].strip()
